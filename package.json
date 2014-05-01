@@ -1,0 +1,27 @@
+{
+	"name": "wildmatch",
+	"version": "0.0.1",
+	"author": "Vincent Meurisse <dev@meurisse.org>",
+	"description": "A glob matching library with the same behaviour as git internal wildmatch function",
+	"keywords": ["match", "glob", "wildmatch", "minimatch", "pattern"],
+	"homepage": "https://github.com/vmeurisse/wildmatch",
+	"bugs": {
+		"url": "https://github.com/vmeurisse/wildmatch/issues"
+	},
+	"devDependencies": {
+		"mocha": "1.18.2"
+	},
+	"scripts": {
+		"test": "mocha --ui tdd"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/vmeurisse/wildmatch.git"
+	},
+	"files": [
+		"package.json",
+		"README.md",
+		"src"
+	],
+	"main": "src/wildmatch.js"
+}
