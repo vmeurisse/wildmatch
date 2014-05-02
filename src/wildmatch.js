@@ -190,6 +190,13 @@ function match(pattern, text, options) {
 		lowPattern = pattern.toLocaleLowerCase();
 		text = text.toLocaleLowerCase();
 	}
+	if (options.matchBase) {
+		if (!~pattern.indexOf('/')) {
+			var lastSlash = text.lastIndexOf('/');
+			if (~lastSlash) text = text.slice(lastSlash + 1);
+		}
+	}
+
 	return imatch(lowPattern, text, options, pattern);
 }
 
