@@ -24,6 +24,8 @@ Wildmatch support the following features:
  * `?`: Match a singe character
  * `*`: Match any string
  * Character classes: list (`[asd]`), ranges (`[a-z]`), POSIX named classes (`[[:alpha:]]`), negation (`[!a-f]` or `[^a-f]`)
+ * Braces expansion: `file.{js,json}` will match `file.js` and `file.json`.
+ * Sequences: `{-1..1}` will turn into (`-1` or `0` or `1`). You can also set a step size (`{-5..5..5}` => `-5`, `0`, `5`), use letters (`{a..e..2}` => `a`, `c`, `e`), and count backward (`{Z..X}` => `Z`, `Y`, `X`)
 
 Options
 -------
@@ -33,3 +35,4 @@ You can path an options object to wildmatch as third parameter. Options include:
  * `matchBase`: If set, then patterns without slashes will be matched against the basename of the path if it contains slashes. For example, `a?b` would match the path `/xyz/123/acb`, but not `/xyz/acb/123`.
  * `nocase`: if set, perform a case-insensitive match
  * `nopathname`: if not set, `?`, `*` and character class do not match the `/` character
+ * `braces`: set it to true to enable the processing of curly braces (braces expansion and sequences)

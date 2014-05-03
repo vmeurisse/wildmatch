@@ -76,7 +76,12 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 					break;
 				}
 				
-				if (patternChar !== '[' && patternChar !== '?') {
+				var specialChars = {
+					'[': true,
+					'?': true
+				};
+				if (options.brace) specialChars['{'] = true;
+				if (!(patternChar in specialChars)) {
 					// If the next char in the pattern is a literal, we can skip all the char in the text until we found it
 					var nextLiteral = (patternChar === '\\') ? pattern[patternPos + 1] : patternChar;
 				} 
@@ -171,6 +176,80 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 				if (patternPos >= patternLength) return wildmatch.WM_ABORT_ALL;
 				if (!!classMatch === !!negated) return wildmatch.WM_NOMATCH;
 				continue;
+			case options.brace && '{':
+				var braces = [];
+				var item = '';
+				initialPos = patternPos;
+				
+				patternChar = pattern[++patternPos];
+				for (;patternPos < patternLength && patternChar !== '}'; patternChar = pattern[++patternPos]) {
+					switch (patternChar) {
+						case '\\':
+							patternChar = pattern[++patternPos];
+							if (patternChar) item += patternChar;
+							break;
+						case ',':
+							braces.push(item);
+							item = '';
+							break;
+						case '{':
+							var nbOpen = 1;
+							var nestedStart = patternPos;
+							while (nbOpen > 0 && patternPos < patternLength - 1) {
+								patternChar = pattern[++patternPos];
+								if (patternChar === '\\') ++patternPos;
+								else if (patternChar === '{') nbOpen++;
+								else if (patternChar === '}') nbOpen--;
+							}
+							item += pattern.slice(nestedStart, patternPos + 1);
+							break;
+						default:
+							item += patternChar;
+					}
+				}
+				braces.push(item);
+				
+				var isSequence = braces.length === 1 && /^(?:[a-z]\.\.[a-z]|[A-Z]\.\.[A-Z]|-?\d+\.\.-?\d+)(?:\.\.-?\d+)?$/.test(braces[0]);
+				if (patternChar !== '}' || (braces.length < 2 && !isSequence)) {
+					// Invalid brace sequence. Treat is as a literal '{'
+					patternPos = initialPos;
+					if (textChar !== '{') return wildmatch.WM_NOMATCH;
+					continue
+				}
+				
+				if (isSequence) {
+					var sequence = braces[0].split('..');
+					braces = [];
+					
+					var start = +sequence[0];
+					var end;
+					var alpha = false;
+					if (isNaN(start)) {
+						alpha = true;
+						start = sequence[0].charCodeAt(0);
+						end = sequence[1].charCodeAt(0);
+					} else {
+						end = +sequence[1];
+					}
+					var increment = +sequence[2];
+					if (!increment || increment * (end - start) < 0) {
+						increment = start < end ? 1 : -1;
+					}
+					
+					for (var i = start; increment * i <= increment * end; i += increment) {
+						braces.push(alpha ? String.fromCharCode(i) : i);
+					}
+				}
+				
+				var patternEnd = pattern.slice(patternPos + 1);
+				var casePatternEnd = casePattern.slice(patternPos + 1);
+				for (var i = 0; i < braces.length; ++i) {
+					item = braces[i];
+					if (imatch(item + patternEnd, text, options, item + casePatternEnd, 0, textPos) === wildmatch.WM_MATCH) {
+						return wildmatch.WM_MATCH;
+					}
+				}
+				return wildmatch.WM_NOMATCH;
 			case '\\':
 				patternChar = pattern[++patternPos];
 				if (patternChar !== textChar) return wildmatch.WM_NOMATCH;
