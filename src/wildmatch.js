@@ -271,7 +271,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 				var patternEnd = pattern.slice(patternPos + 1);
 				var casePatternEnd = casePattern.slice(patternPos + 1);
 				for (var i = 0; i < braces.length; ++i) {
-					item = braces[i];
+					var item = braces[i];
 					if (imatch(item + patternEnd, text, options, item + casePatternEnd, 0, textPos) === wildmatch.WM_MATCH) {
 						return wildmatch.WM_MATCH;
 					}
