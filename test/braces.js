@@ -97,6 +97,9 @@ suite('braces', function() {
 		
 		makeTest.match(['a,b','c'], '{a\\,b,c}');
 		makeTest.nomatch(['a', 'b'], '{a\\,b,c}');
+		
+		makeTest.match(['*','a'], '{\\*,a}');
+		makeTest.nomatch(['xx'], '{\\*,a}');
 	});
 	
 	

@@ -36,33 +36,25 @@ function parseList(pattern, patternPos, sep, open, close) {
 	
 	var patternLength = pattern.length;
 	
+	var nbOpen = 0;
 	var patternChar = pattern[++patternPos];
-	for (;patternPos < patternLength && patternChar !== '}'; patternChar = pattern[++patternPos]) {
-		switch (patternChar) {
-			case '\\':
-				patternChar = pattern[++patternPos];
-				if (patternChar) item += patternChar;
+	var itemStart = patternPos;
+	for (;patternPos < patternLength; patternChar = pattern[++patternPos]) {
+		if (patternChar === '\\') {
+			patternPos++;
+		} else if (patternChar === sep && nbOpen === 0) {
+			items.push(pattern.slice(itemStart, patternPos));
+			itemStart = patternPos + 1;
+		} else if (patternChar === open) {
+			nbOpen++;
+		} else if (patternChar === close) {
+			nbOpen--;
+			if (nbOpen < 0) {
+				items.push(pattern.slice(itemStart, patternPos));
 				break;
-			case sep:
-				items.push(item);
-				item = '';
-				break;
-			case open:
-				var nbOpen = 1;
-				var nestedStart = patternPos;
-				while (nbOpen > 0 && patternPos < patternLength - 1) {
-					patternChar = pattern[++patternPos];
-					if (patternChar === '\\') ++patternPos;
-					else if (patternChar === open) nbOpen++;
-					else if (patternChar === close) nbOpen--;
-				}
-				item += pattern.slice(nestedStart, patternPos + 1);
-				break;
-			default:
-				item += patternChar;
+			}
 		}
 	}
-	items.push(item);
 	
 	if (patternChar === close) {
 		return {
