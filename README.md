@@ -1,4 +1,4 @@
-Wildmatch
+Wildmatch [![NPM version](https://badge.fury.io/js/wildmatch.svg)](http://badge.fury.io/js/wildmatch) [![Build status](https://travis-ci.org/vmeurisse/wildmatch.svg?branch=master)](http://travis-ci.org/vmeurisse/wildmatch)
 =========
 
 Port in JS of the matching library used by Git.
