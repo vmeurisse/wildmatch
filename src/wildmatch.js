@@ -94,8 +94,6 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 				while (pattern[++patternPos] === '*') nbStars++;
 				patternChar = pattern[patternPos];
 				
-				if (nbStars > 2)  return wildmatch.WM_ABORT_MALFORMED;
-				
 				if (nbStars === 2) matchSlaches = true;
 				if (nbStars === 1 && options.nopathname) matchSlaches = true;
 				
@@ -110,7 +108,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 					if (patternChar && imatch(pattern, text, options, casePattern, patternPos + 1, textPos) === wildmatch.WM_MATCH) {
 						return wildmatch.WM_MATCH;
 					}
-				} else if (nbStars === 2 && !options.nopathname) {
+				} else if (nbStars >= 2 && !options.nopathname) {
 					return wildmatch.WM_ABORT_MALFORMED;
 				}
 				
