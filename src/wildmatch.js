@@ -1,7 +1,12 @@
-var NEGATED_CLASS_CHAR = {
-	'!': true,
-	'^': true
-};
+function charMap (chars) {
+	var map = [];
+	chars = chars.split('');
+	for (var i = 0, l = chars.length; i < l; i++) map[chars[i]] = true;
+	return map;
+}
+
+var NEGATED_CLASS_CHAR = charMap('!^');
+var EXTGLOB_START_CHAR = charMap('?*+@!');
 
 var CHAR_CLASS = {
 	alnum: /[a-zA-Z0-9]/,
@@ -19,6 +24,94 @@ var CHAR_CLASS = {
 };
 
 /**
+ * Match a ksh-style exglob pattern
+ * ?(...) match zero or one time the given patterns
+ * *(...) match zero or more time the given patterns
+ * +(...) match one or more time the given patterns
+ * @(...) match once the given patterns
+ * !(...) match anything not in the given patterns
+ */
+function matchExtGlob(pattern, text, options, casePattern, patternPos, textPos) {
+//console.log('matchExtGlob', pattern, text, options, casePattern, patternPos, textPos);
+//console.log('             ' + pattern.slice(patternPos || 0), text.slice(textPos || 0));
+	var extglob = parseList(pattern, patternPos + 1, '|', '(', ')', true);
+	if (!extglob) {
+		// The parenthesis not correctly closed. Treat the end of the pattern as a literal
+		if (pattern.slice(patternPos) === text.slice(textPos)) return wildmatch.WM_MATCH;
+		return wildmatch.WM_NOMATCH;
+	}
+	
+	var extGlobType = pattern[patternPos];
+	var initialPos = patternPos;
+	patternPos = extglob.patternPos + 1;
+	
+	/**
+	 * These can match 0 time. Directly try this before more complex options
+	 */
+	if (extGlobType === '*' || extGlobType === '?' || extGlobType === '!') {
+		if (imatch(pattern, text, options, casePattern, patternPos, textPos) === wildmatch.WM_MATCH) {
+			return wildmatch.WM_MATCH;
+		}
+	}
+	
+	var extglobs = extglob.items;
+	var extglobsCase = parseList(casePattern, initialPos + 1, '|', '(', ')', true).items;
+	var extglobsLength = extglobs.length;
+	
+// 	var specialChars = {
+// 		'[': true,
+// 		'?': true,
+// 		'*': true,
+// 		'+': true,
+// 		'@': true,
+// 		'!': true
+// 	};
+// 	if (options.brace) specialChars['{'] = true;
+// 	
+// 	if (!(pattern[patternPos] in specialChars)) {
+// 		// If the next char in the pattern is a literal, we can skip all the char in the text until we found it
+// 		var nextLiteral = (pattern[patternPos] === '\\') ? pattern[patternPos + 1] : pattern[patternPos];
+// 	}
+	
+	var textPosStart = textPos;
+	textPos++;
+	
+//	if (!pattern[patternPos]) textPos = text.length;
+	
+	for (var textLength = text.length; textPos <= textLength; ++textPos) {
+// 		if (nextLiteral) {
+// 			var pos = text.indexOf(nextLiteral, textPos);
+// 			if (pos === -1) {
+// 				return wildmatch.WM_NOMATCH;
+// 			}
+// 			textPos = pos;
+// 		}
+		
+		var extGlobText = text.slice(textPosStart, textPos);
+		
+		var match;
+		for (var i = 0; i < extglobsLength; ++i) {
+			var extGlobPattern = extglobs[i];
+			var extGlobCasePattern = extglobsCase[i];
+			match = imatch(extGlobPattern, extGlobText, options, extGlobCasePattern);
+			if (match === wildmatch.WM_MATCH) break;
+		}
+		if ((extGlobType === '!') === (match === wildmatch.WM_MATCH)) continue;
+		
+		match = imatch(pattern, text, options, casePattern, patternPos, textPos);
+		if (match === wildmatch.WM_MATCH) return match;
+		
+		if (extGlobType === '*' || extGlobType === '+') {
+			if (imatch(pattern, text, options, casePattern, initialPos, textPos) === wildmatch.WM_MATCH) {
+				return wildmatch.WM_MATCH;
+			}
+		}
+	}
+	
+	return wildmatch.WM_NOMATCH;
+}
+
+/**
  * Read a sequence inside the pattern and parse the first level
  * @param {string} pattern - the pattern to operate on
  * @param {integer} patternPos - the initial position in the pattern. Should correspond to the index of the opening char
@@ -26,32 +119,54 @@ var CHAR_CLASS = {
  * @param {char} sep - The char used to separate items of the list
  * @param {char} open - The opening char of the list. Used to spot sublists
  * @param {char} close - The closing char of the list
+ * @param {boolean} parseClasses - If true, char classes inside list are read. eg `?([|])` should be parsed as `['[|]']`
+ *                                 and not `['[', ']']`.
  * @return {null|Object} `null` if we cannot parse the list. Otherwise we return an object with `patternPos` equals to
  *                       the index of the closing char of the sequence and `items` an array of the parsed items in the
  *                       list
  */
-function parseList(pattern, patternPos, sep, open, close) {
+function parseList(pattern, patternPos, sep, open, close, parseClasses) {
 	var items = [];
 	var item = '';
 	
 	var patternLength = pattern.length;
 	
-	var nbOpen = 0;
+	var nbSublist = 0;
+	var nbSubclass = 0;
+	var classStart;
+	var subClassStart;
 	var patternChar = pattern[++patternPos];
 	var itemStart = patternPos;
 	for (;patternPos < patternLength; patternChar = pattern[++patternPos]) {
 		if (patternChar === '\\') {
 			patternPos++;
-		} else if (patternChar === sep && nbOpen === 0) {
+		} else if (patternChar === sep && nbSublist === 0 && nbSubclass == 0) {
 			items.push(pattern.slice(itemStart, patternPos));
 			itemStart = patternPos + 1;
-		} else if (patternChar === open) {
-			nbOpen++;
-		} else if (patternChar === close) {
-			nbOpen--;
-			if (nbOpen < 0) {
+		} else if (patternChar === open && nbSubclass === 0) {
+			nbSublist++;
+		} else if (patternChar === close && nbSubclass === 0) {
+			nbSublist--;
+			if (nbSublist < 0) {
 				items.push(pattern.slice(itemStart, patternPos));
 				break;
+			}
+		} else if (parseClasses) {
+			if (patternChar === '[') {
+				if (nbSubclass === 0) {
+					if (pattern[patternPos + 1] in NEGATED_CLASS_CHAR) classStart = patternPos + 2;
+					else classStart = patternPos + 1;
+					nbSubclass = 1;
+				} else if (nbSubclass === 1 && pattern[patternPos + 1] === ':') {
+					subClassStart = patternPos + 2;
+					nbSubclass = 2;
+				}
+			} else if (nbSubclass > 0 && patternChar === ']') {
+				if (nbSubclass === 2 && patternPos > subClassStart && pattern[patternPos - 1] === ']') {
+					nbSubclass = 1;
+				} else if (patternPos > classStart) {
+					nbSubclass = 0;
+				}
 			}
 		}
 	}
@@ -66,6 +181,8 @@ function parseList(pattern, patternPos, sep, open, close) {
 }
 
 function imatch(pattern, text, options, casePattern, patternPos, textPos) {
+//console.log('imatch', pattern, text, options, casePattern, patternPos, textPos);
+//console.log('       ' + pattern.slice(patternPos || 0), text.slice(textPos || 0));
 	var patternLength = pattern.length;
 	var textLength = text.length;
 	textPos = textPos || 0;
@@ -74,16 +191,30 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 		var patternChar = pattern[patternPos];
 		var textChar = text[textPos];
 		
-		if (!textChar && patternChar !== '*') return wildmatch.WM_ABORT_ALL;
+		if (!textChar) {
+			// We are at the end of the text to match
+			// return WM_ABORT_ALL unless the end of the pattern can be matched to the empty string:
+			// *, *(...), ?(...) or !(...)
+			if (!(
+				patternChar === '*' ||
+				(options.extglob && (patternChar === '?' || patternChar === '!') && pattern[patternPos + 1] === '(')
+			)) {
+				return wildmatch.WM_ABORT_ALL;
+			}
+		}
+		
+		if (options.extglob && patternChar in EXTGLOB_START_CHAR && pattern[patternPos + 1] === '(') {
+			return matchExtGlob(pattern, text, options, casePattern, patternPos, textPos);
+		}
 		
 		switch (patternChar) {
 			case '?':
 				if (!options.nopathname && textChar === '/') return wildmatch.WM_NOMATCH;
 				continue;
-			case '*': 
+			case '*':
 				var matchSlaches = false;
 				var nbStars = 1;
-				while (pattern[++patternPos] === '*') nbStars++;
+				while (pattern[++patternPos] === '*' && (!options.extglob || pattern[patternPos + 1] !== '(')) nbStars++;
 				patternChar = pattern[patternPos];
 				
 				if (nbStars === 2) matchSlaches = true;
@@ -126,11 +257,13 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 					'?': true
 				};
 				if (options.brace) specialChars['{'] = true;
+				if (options.extglob) for (var key in EXTGLOB_START_CHAR) specialChars[key] = true;
 				if (!(patternChar in specialChars)) {
 					// If the next char in the pattern is a literal, we can skip all the char in the text until we found it
 					var nextLiteral = (patternChar === '\\') ? pattern[patternPos + 1] : patternChar;
-				} 
-				for (; textChar; textChar = text[++textPos]) {
+				}
+				for (; textPos <= textLength; ++textPos) {
+//for (; textChar; textChar = text[++textPos]) {
 					if (nextLiteral) {
 						var pos = text.indexOf(nextLiteral, textPos);
 						if (!matchSlaches && nextLiteral !== '/') var slashPos = text.indexOf('/', textPos);
@@ -282,6 +415,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 
 function match(pattern, text, options) {
 	var lowPattern = pattern;
+	
 	if (options.nocase) {
 		lowPattern = pattern.toLocaleLowerCase();
 		text = text.toLocaleLowerCase();
@@ -292,7 +426,7 @@ function match(pattern, text, options) {
 			if (~lastSlash) text = text.slice(lastSlash + 1);
 		}
 	}
-
+	
 	return imatch(lowPattern, text, options, pattern);
 }
 

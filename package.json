@@ -12,7 +12,7 @@
 		"mocha": "1.18.2"
 	},
 	"scripts": {
-		"test": "mocha --ui tdd"
+		"test": "mocha --ui tdd --recursive"
 	},
 	"repository": {
 		"type": "git",

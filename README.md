@@ -26,6 +26,12 @@ Wildmatch support the following features:
  * Character classes: list (`[asd]`), ranges (`[a-z]`), POSIX named classes (`[[:alpha:]]`), negation (`[!a-f]` or `[^a-f]`)
  * Braces expansion: `file.{js,json}` will match `file.js` and `file.json`.
  * Sequences: `{-1..1}` will turn into (`-1` or `0` or `1`). You can also set a step size (`{-5..5..5}` => `-5`, `0`, `5`), use letters (`{a..e..2}` => `a`, `c`, `e`), and count backward (`{Z..X}` => `Z`, `Y`, `X`)
+ * Extended glob: `pattern-list` is a list of patterns separated by `|`
+   * `?(pattern-list)`: Matches zero or one occurrence of the given patterns
+   * `*(pattern-list)`: Matches zero or more occurrences of the given patterns
+   * `+(pattern-list)`: Matches one or more occurrences of the given patterns
+   * `@(pattern-list)`: Matches one occurrences of the given patterns
+   * `!(pattern-list)`: Matches anything except one of the given patterns
 
 Options
 -------
@@ -36,3 +42,4 @@ You can path an options object to wildmatch as third parameter. Options include:
  * `nocase`: if set, perform a case-insensitive match
  * `nopathname`: if not set, `?`, `*` and character class do not match the `/` character
  * `braces`: set it to true to enable the processing of curly braces (braces expansion and sequences)
+ * `extglob`: match extended glob pattern lists
