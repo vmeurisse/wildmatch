@@ -15,29 +15,29 @@ var makeTest = {
 			assert.equal(res, !nomatch, 'Expected ' + (nomatch ? 'no ' : '') + 'match, got ' + res);
 			
 			var flags = 0;
-			if (!options || !options.nopathname) flags = flags | wildmatch.WM_PATHNAME;
-			if (options && options.nocase) flags = flags | wildmatch.WM_CASEFOLD;
+			if (options && options.pathname) flags = flags | wildmatch.WM_PATHNAME;
+			if (options && options.case === false) flags = flags | wildmatch.WM_CASEFOLD;
 			res = wildmatch.c(pattern, text, flags);
 			assert.equal(!res, !nomatch, '<C interface> Expected ' + (nomatch ? 'no ' : '') + 'match, got ' + res);
 		});
 	},
 	match: function(text, pattern) {
-		makeTest.makeTest('match', text, pattern);
+		makeTest.makeTest('match', text, pattern, { pathname: true });
 	},
 	nomatch: function(text, pattern) {
-		makeTest.makeTest('nomatch', text, pattern, null, true);
+		makeTest.makeTest('nomatch', text, pattern, { pathname: true }, true);
 	},
 	pathmatch: function(text, pattern) {
-		makeTest.makeTest('pathmatch', text, pattern, { nopathname: true });
+		makeTest.makeTest('pathmatch', text, pattern);
 	},
 	nopathmatch: function(text, pattern) {
-		makeTest.makeTest('nopathmatch', text, pattern, { nopathname: true }, true);
+		makeTest.makeTest('nopathmatch', text, pattern, null, true);
 	},
 	imatch: function(text, pattern) {
-		makeTest.makeTest('imatch', text, pattern, { nocase: true });
+		makeTest.makeTest('imatch', text, pattern, { case: false, pathname: true });
 	},
 	noimatch: function(text, pattern) {
-		makeTest.makeTest('noimatch', text, pattern, { nocase: true }, true);
+		makeTest.makeTest('noimatch', text, pattern, { case: false, pathname: true }, true);
 	},
 };
 

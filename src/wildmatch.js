@@ -23,6 +23,22 @@ var CHAR_CLASS = {
 	xdigit: /[A-Fa-f0-9]/
 };
 
+var DEFAULT_OPTS = {
+	case: true,
+	pathname: false,
+	extglob: true,
+	brace: true,
+	matchBase: false
+};
+
+var C_DEFAULT_OPTS = {
+	case: true,
+	pathname: false,
+	extglob: false,
+	brace: false,
+	matchBase: false
+};
+
 /**
  * Match a ksh-style exglob pattern
  * ?(...) match zero or one time the given patterns
@@ -209,7 +225,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 		
 		switch (patternChar) {
 			case '?':
-				if (!options.nopathname && textChar === '/') return wildmatch.WM_NOMATCH;
+				if (options.pathname && textChar === '/') return wildmatch.WM_NOMATCH;
 				continue;
 			case '*':
 				var matchSlaches = false;
@@ -218,7 +234,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 				patternChar = pattern[patternPos];
 				
 				if (nbStars === 2) matchSlaches = true;
-				if (nbStars === 1 && options.nopathname) matchSlaches = true;
+				if (nbStars === 1 && !options.pathname) matchSlaches = true;
 				
 				if (nbStars === 2 &&
 				    (patternPos < 3 || pattern[patternPos - 3] === '/') &&
@@ -231,7 +247,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 					if (patternChar && imatch(pattern, text, options, casePattern, patternPos + 1, textPos) === wildmatch.WM_MATCH) {
 						return wildmatch.WM_MATCH;
 					}
-				} else if (nbStars >= 2 && !options.nopathname) {
+				} else if (nbStars >= 2 && options.pathname) {
 					return wildmatch.WM_ABORT_MALFORMED;
 				}
 				
@@ -277,7 +293,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 				}
 				continue;
 			case '[':
-				if (!options.nopathname && textChar === '/') return wildmatch.WM_NOMATCH;
+				if (options.pathname && textChar === '/') return wildmatch.WM_NOMATCH;
 				if (pattern[patternPos + 1] in NEGATED_CLASS_CHAR) {
 					var negated = true;
 					patternPos++;
@@ -305,7 +321,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 						
 						if (textCharCode >= previousCharCode && textCharCode <= charCode) {
 							classMatch = true;
-						} else if (options.nocase) {
+						} else if (!options.case) {
 							textCharCode = textChar.toLocaleUpperCase().charCodeAt(0);
 							if (textCharCode >= previousCharCode && textCharCode <= charCode) {
 								classMatch = true;
@@ -323,7 +339,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 							var className = pattern.slice(initialPos, patternPos - 1);
 							if (className in CHAR_CLASS) {
 								if (CHAR_CLASS[className].test(textChar) ||
-								    (className === 'upper' && options.nocase && CHAR_CLASS['lower'].test(textChar))) {
+								    (className === 'upper' && !options.case && CHAR_CLASS['lower'].test(textChar))) {
 									classMatch = true;
 								}
 								noRange = true; //Prevent [[:alpha:]-z] to match 'c'
@@ -416,7 +432,7 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 function match(pattern, text, options) {
 	var lowPattern = pattern;
 	
-	if (options.nocase) {
+	if (!options.case) {
 		lowPattern = pattern.toLocaleLowerCase();
 		text = text.toLocaleLowerCase();
 	}
@@ -430,23 +446,44 @@ function match(pattern, text, options) {
 	return imatch(lowPattern, text, options, pattern);
 }
 
-function wildmatch(text, pattern, options) {
-	return !match(pattern, text, options || {});
-}
+function getWild(defaults) {
+	for (var opts in DEFAULT_OPTS) {
+		if (defaults[opts] === undefined) defaults[opts] = DEFAULT_OPTS[opts];
+	}
+	
+	function wildmatch(text, pattern, options) {
+		options = options || {};
+		for (var opts in defaults) {
+			if (options[opts] === undefined) options[opts] = defaults[opts];
+		}
+		return !match(pattern, text, options);
+	}
+	
+	wildmatch.defaults = getWild;
+	
+	wildmatch.WM_CASEFOLD = 1;
+	wildmatch.WM_PATHNAME = 2;
+	
+	wildmatch.WM_ABORT_MALFORMED = 2;
+	wildmatch.WM_NOMATCH = 1;
+	wildmatch.WM_MATCH = 0;
+	wildmatch.WM_ABORT_ALL = -1;
+	
+	return wildmatch;
+};
+
+var wildmatch = getWild({});
 
 wildmatch.c = function c(pattern, text, flags) {
-	var options = {};
-	if (flags & wildmatch.WM_CASEFOLD) options.nocase = true;
-	if (!(flags & wildmatch.WM_PATHNAME)) options.nopathname = true;
+	var options = C_DEFAULT_OPTS;
+	if (flags) {
+		options = Object.create(C_DEFAULT_OPTS);
+		if (flags & wildmatch.WM_CASEFOLD) options.case = false;
+		if (flags & wildmatch.WM_PATHNAME) options.pathname = true;
+	}
 	return match(pattern, text, options);
 };
 
-wildmatch.WM_CASEFOLD = 1;
-wildmatch.WM_PATHNAME = 2;
 
-wildmatch.WM_ABORT_MALFORMED = 2;
-wildmatch.WM_NOMATCH = 1;
-wildmatch.WM_MATCH = 0;
-wildmatch.WM_ABORT_ALL = -1;
 
 module.exports = wildmatch;

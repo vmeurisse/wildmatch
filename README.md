@@ -39,7 +39,7 @@ Options
 You can path an options object to wildmatch as third parameter. Options include:
 
  * `matchBase`: If set, then patterns without slashes will be matched against the basename of the path if it contains slashes. For example, `a?b` would match the path `/xyz/123/acb`, but not `/xyz/acb/123`.
- * `nocase`: if set, perform a case-insensitive match
- * `nopathname`: if not set, `?`, `*` and character class do not match the `/` character
- * `braces`: set it to true to enable the processing of curly braces (braces expansion and sequences)
- * `extglob`: match extended glob pattern lists
+ * `case`: if set to `false`, perform a case-insensitive match
+ * `pathname`: if set, `?`, `*` and character class do not match the `/` character
+ * `braces`: set it to `false` to disable the processing of curly braces (braces expansion and sequences)
+ * `extglob`: set it to `false` to disable the match of extended glob pattern lists
