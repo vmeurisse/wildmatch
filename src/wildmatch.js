@@ -18,6 +18,61 @@ var CHAR_CLASS = {
 	xdigit: /[A-Fa-f0-9]/
 };
 
+/**
+ * Read a sequence inside the pattern and parse the first level
+ * @param {string} pattern - the pattern to operate on
+ * @param {integer} patternPos - the initial position in the pattern. Should correspond to the index of the opening char
+ *                               of the list.
+ * @param {char} sep - The char used to separate items of the list
+ * @param {char} open - The opening char of the list. Used to spot sublists
+ * @param {char} close - The closing char of the list
+ * @return {null|Object} `null` if we cannot parse the list. Otherwise we return an object with `patternPos` equals to
+ *                       the index of the closing char of the sequence and `items` an array of the parsed items in the
+ *                       list
+ */
+function parseList(pattern, patternPos, sep, open, close) {
+	var items = [];
+	var item = '';
+	
+	var patternLength = pattern.length;
+	
+	var patternChar = pattern[++patternPos];
+	for (;patternPos < patternLength && patternChar !== '}'; patternChar = pattern[++patternPos]) {
+		switch (patternChar) {
+			case '\\':
+				patternChar = pattern[++patternPos];
+				if (patternChar) item += patternChar;
+				break;
+			case sep:
+				items.push(item);
+				item = '';
+				break;
+			case open:
+				var nbOpen = 1;
+				var nestedStart = patternPos;
+				while (nbOpen > 0 && patternPos < patternLength - 1) {
+					patternChar = pattern[++patternPos];
+					if (patternChar === '\\') ++patternPos;
+					else if (patternChar === open) nbOpen++;
+					else if (patternChar === close) nbOpen--;
+				}
+				item += pattern.slice(nestedStart, patternPos + 1);
+				break;
+			default:
+				item += patternChar;
+		}
+	}
+	items.push(item);
+	
+	if (patternChar === close) {
+		return {
+			patternPos: patternPos,
+			items: items
+		}
+	}
+	return null;
+}
+
 function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 	var patternLength = pattern.length;
 	var textLength = text.length;
@@ -177,44 +232,16 @@ function imatch(pattern, text, options, casePattern, patternPos, textPos) {
 				if (!!classMatch === !!negated) return wildmatch.WM_NOMATCH;
 				continue;
 			case options.brace && '{':
-				var braces = [];
-				var item = '';
-				initialPos = patternPos;
+				var braces = parseList(pattern, patternPos, ',', '{', '}');
+				var isSequence = braces && braces.items.length === 1 && /^(?:[a-z]\.\.[a-z]|[A-Z]\.\.[A-Z]|-?\d+\.\.-?\d+)(?:\.\.-?\d+)?$/.test(braces.items[0]);
 				
-				patternChar = pattern[++patternPos];
-				for (;patternPos < patternLength && patternChar !== '}'; patternChar = pattern[++patternPos]) {
-					switch (patternChar) {
-						case '\\':
-							patternChar = pattern[++patternPos];
-							if (patternChar) item += patternChar;
-							break;
-						case ',':
-							braces.push(item);
-							item = '';
-							break;
-						case '{':
-							var nbOpen = 1;
-							var nestedStart = patternPos;
-							while (nbOpen > 0 && patternPos < patternLength - 1) {
-								patternChar = pattern[++patternPos];
-								if (patternChar === '\\') ++patternPos;
-								else if (patternChar === '{') nbOpen++;
-								else if (patternChar === '}') nbOpen--;
-							}
-							item += pattern.slice(nestedStart, patternPos + 1);
-							break;
-						default:
-							item += patternChar;
-					}
-				}
-				braces.push(item);
-				
-				var isSequence = braces.length === 1 && /^(?:[a-z]\.\.[a-z]|[A-Z]\.\.[A-Z]|-?\d+\.\.-?\d+)(?:\.\.-?\d+)?$/.test(braces[0]);
-				if (patternChar !== '}' || (braces.length < 2 && !isSequence)) {
+				if (!braces || (braces.items.length < 2 && !isSequence)) {
 					// Invalid brace sequence. Treat is as a literal '{'
-					patternPos = initialPos;
 					if (textChar !== '{') return wildmatch.WM_NOMATCH;
 					continue
+				} else {
+					patternPos = braces.patternPos;
+					braces = braces.items;
 				}
 				
 				if (isSequence) {
