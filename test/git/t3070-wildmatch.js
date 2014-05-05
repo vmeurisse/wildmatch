@@ -5,7 +5,7 @@
  */
 
 var assert = require('assert');
-var wildmatch = require('../src/wildmatch');
+var wildmatch = require('../../src/wildmatch');
 
 var makeTest = {
 	makeTest: function(name, text, pattern, options, nomatch) {
