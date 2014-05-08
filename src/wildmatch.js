@@ -74,34 +74,35 @@ function matchExtGlob(pattern, text, options, casePattern, patternPos, textPos) 
 	var extglobsCase = parseList(casePattern, initialPos + 1, '|', '(', ')', true).items;
 	var extglobsLength = extglobs.length;
 	
-// 	var specialChars = {
-// 		'[': true,
-// 		'?': true,
-// 		'*': true,
-// 		'+': true,
-// 		'@': true,
-// 		'!': true
-// 	};
-// 	if (options.brace) specialChars['{'] = true;
-// 	
-// 	if (!(pattern[patternPos] in specialChars)) {
-// 		// If the next char in the pattern is a literal, we can skip all the char in the text until we found it
-// 		var nextLiteral = (pattern[patternPos] === '\\') ? pattern[patternPos + 1] : pattern[patternPos];
-// 	}
-	
 	var textPosStart = textPos;
 	textPos++;
-	
-//	if (!pattern[patternPos]) textPos = text.length;
+
+	if (false && extGlobType !== '*' && extGlobType !== '+') {
+		var specialChars = {
+			'[': true,
+			'?': true,
+			'*': true,
+			'+': true,
+			'@': true,
+			'!': true
+		};
+		if (options.brace) specialChars['{'] = true;
+		
+		if (!(pattern[patternPos] in specialChars)) {
+			// If the next char in the pattern is a literal, we can skip all the char in the text until we found it
+			var nextLiteral = (pattern[patternPos] === '\\') ? pattern[patternPos + 1] : pattern[patternPos];
+		}
+		if (!pattern[patternPos]) textPos = text.length;
+	}
 	
 	for (var textLength = text.length; textPos <= textLength; ++textPos) {
-// 		if (nextLiteral) {
-// 			var pos = text.indexOf(nextLiteral, textPos);
-// 			if (pos === -1) {
-// 				return wildmatch.WM_NOMATCH;
-// 			}
-// 			textPos = pos;
-// 		}
+		if (nextLiteral) {
+			var pos = text.indexOf(nextLiteral, textPos);
+			if (pos === -1) {
+				return wildmatch.WM_NOMATCH;
+			}
+			textPos = pos;
+		}
 		
 		var extGlobText = text.slice(textPosStart, textPos);
 		
